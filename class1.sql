@@ -1,5 +1,4 @@
 create database university;
-
 use university;
 
   create table course(
@@ -20,7 +19,6 @@ use university;
  -- PRIMARY KEY CONSTRAINT:
 
  create database xyz_company;
-
  use xyz_company;
 
  create table employee1(

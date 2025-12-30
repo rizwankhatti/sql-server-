@@ -17,6 +17,8 @@ SELECT * FROM [BikeStores].[sales].[customers] WHERE state = 'NY';
 
 SELECT * FROM [BikeStores].[sales].[customers] WHERE customer_id > 100;
 
+select * from [BikeStores].[sales].[customers] where last_name = 'Todd';
+
 SELECT * FROM [BikeStores].[sales].[customers] WHERE state <> 'NY';
 
 -- operators(AND, OR, NOT, BETWEEN)
@@ -29,7 +31,11 @@ SELECT * FROM [BikeStores].[sales].[customers] WHERE phone <> 'NULL';
 
 SELECT * 
 FROM [BikeStores].[sales].[customers]
-WHERE customer_id BETWEEN 101 AND 155;     
+WHERE customer_id BETWEEN 101 AND 155;  
+
+select * 
+from [sales].[customers]
+where customer_id between 101 and 105;
 
 -- get
 -- last_name : Bates
@@ -72,6 +78,10 @@ WHERE first_name LIKE  'Aa_on';
 SELECT * 
 FROM [BikeStores].[sales].[customers]                          
 WHERE first_name LIKE  'Da_yl';
+
+SELECT * 
+FROM [BikeStores].[sales].[customers]                          
+WHERE first_name LIKE  'Da__l';
 
 SELECT * 
 FROM [BikeStores].[sales].[customers]                          
