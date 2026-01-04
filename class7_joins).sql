@@ -41,6 +41,9 @@ select * from hr.candidates;
 select id as ID, fullname as fn 
 from hr.employees;
 
+select id as ID, fullname as fn
+from hr.candidates;
+
 -- alias on table
 
 select e.id as ID, e.fullname as fn 
@@ -56,7 +59,7 @@ from hr.candidates c
 inner join hr.employees e
     on e.fullname = c.fullname;
 
-select id, fullname -- error because to ambigious coloumns bcz alias not defined
+select id, fullname -- error because of ambigious coloumns bcz alias not defined
 from hr.candidates c
 inner join hr.employees e
     on e.fullname = c.fullname;
