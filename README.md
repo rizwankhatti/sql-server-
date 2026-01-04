@@ -1,128 +1,220 @@
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import random
+## Install SQL Server
 
-np.random.seed(42)
-random.seed(42)
-
-# Define possible values
-sequencing_techs = ['Illumina NovaSeq', 'Illumina HiSeq', 'Illumina MiSeq', 
-                    'Nanopore MinION', 'Nanopore GridION', 'PacBio Sequel', 
-                    'Ion Torrent', 'BGISEQ-500']
-
-reference_genomes = ['GRCh38', 'GRCh37', 'HG38', 'HG19', 'mm10', 'rn6', 'dm6']
-chromosomes = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
-
-# Sample IDs
-sample_ids = [f'SAMP_{i:05d}' for i in range(1, 501)]
-
-# Generate 50,000 records
-n_records = 50000
-
-print("Generating DNA sequences...")
-data = {
-    'Sequence_ID': [f'SEQ_{i:07d}' for i in range(1, n_records + 1)],
-    'DNA_Sequence': [''.join(np.random.choice(['A', 'T', 'C', 'G'], size=random.randint(100, 300))) 
-                     for _ in range(n_records)],
-    'Sequence_Length': np.random.randint(100, 301, n_records),
-    'GC_Content': np.round(np.random.uniform(30.0, 60.0, n_records), 2),
-    'Read_Quality': np.round(np.random.uniform(20.0, 40.0, n_records), 2),
-    'Sequencing_Technology': np.random.choice(sequencing_techs, n_records),
-    'Sample_ID': np.random.choice(sample_ids, n_records),
-    'Coverage': np.random.randint(10, 101, n_records),
-    'Error_Rate': np.round(np.random.exponential(0.005, n_records), 5),
-    'Reference_Genome': np.random.choice(reference_genomes, n_records),
-    'Alignment_Position': [f'{random.choice(chromosomes)}:{random.randint(1, 1000000)}-{random.randint(1000001, 2000000)}' 
-                          for _ in range(n_records)],
-    'Date_Sequenced': [(datetime(2024, 1, 1) + timedelta(days=random.randint(0, 365))).strftime('%Y-%m-%d') 
-                      for _ in range(n_records)]
-}
-
-# Create DataFrame
-df = pd.DataFrame(data)
-print(f"DataFrame created with {len(df)} records")
-
-# Calculate actual GC content from generated sequences
-def calculate_gc_content(seq):
-    gc_count = seq.count('G') + seq.count('C')
-    return round((gc_count / len(seq)) * 100, 2)
-
-print("Calculating actual GC content...")
-df['GC_Content'] = df['DNA_Sequence'].apply(calculate_gc_content)
-
-# Adjust error rate based on technology
-tech_error_rates = {
-    'Nanopore MinION': 0.01,
-    'Nanopore GridION': 0.008,
-    'PacBio Sequel': 0.005,
-    'Illumina MiSeq': 0.001,
-    'Illumina HiSeq': 0.0008,
-    'Illumina NovaSeq': 0.0005,
-    'Ion Torrent': 0.002,
-    'BGISEQ-500': 0.0015
-}
-
-print("Adjusting error rates by technology...")
-for tech, base_rate in tech_error_rates.items():
-    mask = df['Sequencing_Technology'] == tech
-    tech_count = mask.sum()
-    if tech_count > 0:
-        df.loc[mask, 'Error_Rate'] = np.abs(np.random.normal(base_rate, base_rate/2, tech_count))
-        # Ensure minimum error rate
-        df.loc[mask, 'Error_Rate'] = df.loc[mask, 'Error_Rate'].clip(lower=0.00001)
-
-# Adjust quality based on error rate (avoid division by zero)
-print("Calculating read quality...")
-df['Read_Quality'] = np.round(-10 * np.log10(df['Error_Rate'].clip(lower=0.0000001)), 2)
-
-# Save to CSV
-print("Saving to CSV...")
-df.to_csv('dna_sequencing_dataset_50k.csv', index=False)
-print(f"✓ Dataset with {len(df)} records saved to 'dna_sequencing_dataset_50k.csv'")
-
-# Try to save to Excel if openpyxl is available, otherwise skip
-try:
-    import openpyxl
-    print("Saving to Excel...")
-    with pd.ExcelWriter('dna_sequencing_dataset_50k.xlsx', engine='openpyxl') as writer:
-        # Split into chunks for Excel
-        chunks = [df.iloc[i:i+10000] for i in range(0, len(df), 10000)]
-        for i, chunk in enumerate(chunks):
-            chunk.to_excel(writer, sheet_name=f'Data_{i+1}', index=False)
-        
-        # Create a summary sheet
-        summary = pd.DataFrame({
-            'Metric': ['Total Records', 'Unique Samples', 'Technologies', 'Date Range', 
-                      'Avg GC Content', 'Avg Coverage', 'Avg Quality'],
-            'Value': [len(df), df['Sample_ID'].nunique(), 
-                     ', '.join(df['Sequencing_Technology'].unique()[:3]) + '...',
-                     f"{df['Date_Sequenced'].min()} to {df['Date_Sequenced'].max()}",
-                     f"{df['GC_Content'].mean():.2f}%",
-                     f"{df['Coverage'].mean():.1f}x",
-                     f"{df['Read_Quality'].mean():.2f}"]
-        })
-        summary.to_excel(writer, sheet_name='Summary', index=False)
+- We'll be using **SQL Server 2022 Developer Edition** and **SQL Server Management Studio (SSMS)**.
+- To install the Microsoft SQL Server 2022 Developer Edition please follow the steps mentioned in below link
+    - Note: 
+        - Below attached link is of installation of SQL Server 2019 but it is same for SQL server 2022.
+        - At some points whil installation you may see Azure SQL tab appear which are not covered in below link. you can simply **NEXT** those steps.
+    - [Installation of Mircosoft SQL Server](https://www.sqlservertutorial.net/getting-started/install-sql-server/)
     
-    print("✓ Excel file 'dna_sequencing_dataset_50k.xlsx' created")
-except ImportError:
-    print("⚠ openpyxl not installed. Skipping Excel export.")
-    print("To install: pip install openpyxl")
-    # Save as multiple CSV files instead
-    chunks = [df.iloc[i:i+10000] for i in range(0, len(df), 10000)]
-    for i, chunk in enumerate(chunks):
-        chunk.to_csv(f'dna_sequencing_part_{i+1}.csv', index=False)
-    print(f"✓ Split into {len(chunks)} CSV files")
 
-# Print dataset summary
-print("\n" + "="*50)
-print("DATASET SUMMARY")
-print("="*50)
-print(f"Total records: {len(df):,}")
-print(f"Unique samples: {df['Sample_ID'].nunique()}")
-print(f"Technologies: {', '.join(df['Sequencing_Technology'].unique())}")
-print(f"Date range: {df['Date_Sequenced'].min()} to {df['Date_Sequenced'].max()}")
-print(f"GC Content range: {df['GC_Content'].min():.1f}% to {df['GC_Content'].max():.1f}%")
-print(f"Coverage range: {df['Coverage'].min()}x to {df['Coverage'].max()}x")
-print(f"Quality range: {df['Read_Quality'].min():.1f} to {df['Read_Quality'].max():.1f}")
-print("="*50)
+## Verificationof SQL Server Installation
+
+- In this Step we'll connect to SQL Server from the SQL Server Management Studio and execute a query.
+- NOTE: If Query execuation completes successfully its mean our intallation is successfull.
+- Please follow the setsp mentioned in below link to connect to SQL Server from the SQL Server Management Studio and execute a query.
+- [Connecting to SQL server & execuating Query](https://www.sqlservertutorial.net/getting-started/connect-to-the-sql-server/)
+
+## Creating a Database
+
+- In this steps we'll be getting started with database creations & cover following topics with help of BikeStore Case Study
+    - Understanding the Database Diagram
+    - Creating Databse, Schemas & tables
+    - Concept of Forigen Key & Primary Key, Composite Keys
+    - Check Constraints while creating tables
+    - relationship between tables
+        - one to one relationship
+        - one to many relatioship
+        - many to many relatioship
+
+### Databse Diagram fron BIKESTORE Case Study
+
+The following illustrates the BikeStores database diagram:
+
+![bikestore Database](../img/bikstore-database.png)
+
+Attaching references fo relatioship understanding in above diagram
+
+![erd relation](../img/erd-notation.png)
+
+#### OBSERVATIONS:
+- The BikeStores sample database has two schemas sales and production
+- These schemas have nine tables.
+- one to one relatioship
+    - Staffs ↔ Staffs (manager_id and staff_id)  
+- one to many relatioship
+    - Customers ↔ Orders
+    - Stores ↔ Staffs
+    - Stores ↔ Orders
+    - Categories ↔ Products
+    - Brands ↔ Products
+- many to many relastioship
+    - Products ↔ Orders (through Order_Items)
+    - Stores ↔ Products (through Stocks)
+
+#### CREATE TABLE COMMANDS
+
+- Table `production.categories`
+
+    ```sql
+    CREATE TABLE production.categories (
+	category_id INT IDENTITY (1, 1) PRIMARY KEY,
+	category_name VARCHAR (255) NOT NULL
+    );
+    ```
+- Table `production.brands`
+
+    ```sql
+    CREATE TABLE production.brands (
+	brand_id INT IDENTITY (1, 1) PRIMARY KEY,
+	brand_name VARCHAR (255) NOT NULL
+    );
+    ```
+- Table `production.products`
+
+    ```sql
+    CREATE TABLE production.products (
+	product_id INT IDENTITY (1, 1) PRIMARY KEY,
+	product_name VARCHAR (255) NOT NULL,
+	brand_id INT NOT NULL,
+	category_id INT NOT NULL,
+	model_year SMALLINT NOT NULL,
+	list_price DECIMAL (10, 2) NOT NULL,
+	FOREIGN KEY (category_id) 
+        REFERENCES production.categories (category_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (brand_id) 
+        REFERENCES production.brands (brand_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+    ); 
+    ```
+
+NOE:
+- **ON DELETE CASCADE:** Deletes referencing rows in the child table when a row in the parent table is deleted.
+- **ON UPDATE CASCADE:** Updates referencing rows in the child table when a row in the parent table is updated.
+- **ON DELETE NO ACTION:** Prevents deletion in the parent table if there are referencing rows in the child table.
+- **ON UPDATE NO ACTION:** Prevents update in the parent table if there are referencing rows in the child table.
+
+- Table `sales.stores`
+
+    ```sql
+    CREATE TABLE sales.stores (
+	store_id INT IDENTITY (1, 1) PRIMARY KEY,
+	store_name VARCHAR (255) NOT NULL,
+	phone VARCHAR (25),
+	email VARCHAR (255),
+	street VARCHAR (255),
+	city VARCHAR (255),
+	state VARCHAR (10),
+	zip_code VARCHAR (5)
+    );
+    ```
+
+- Table `production.products`
+
+    ```sql
+    CREATE TABLE production.products (
+	product_id INT IDENTITY (1, 1) PRIMARY KEY,
+	product_name VARCHAR (255) NOT NULL,
+	brand_id INT NOT NULL,
+	category_id INT NOT NULL,
+	model_year SMALLINT NOT NULL,
+	list_price DECIMAL (10, 2) NOT NULL,
+	FOREIGN KEY (category_id) 
+        REFERENCES production.categories (category_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (brand_id) 
+        REFERENCES production.brands (brand_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+    ); 
+    ```
+
+- Table `sales.staffs`
+
+    ```sql
+    CREATE TABLE sales.staffs (
+        staff_id INT IDENTITY (1, 1) PRIMARY KEY,
+        first_name VARCHAR (50) NOT NULL,
+        last_name VARCHAR (50) NOT NULL,
+        email VARCHAR (255) NOT NULL UNIQUE,
+        phone VARCHAR (25),
+        active tinyint NOT NULL,
+        store_id INT NOT NULL,
+        manager_id INT,
+        FOREIGN KEY (store_id) 
+            REFERENCES sales.stores (store_id) 
+            ON DELETE CASCADE ON UPDATE CASCADE,
+        FOREIGN KEY (manager_id) 
+            REFERENCES sales.staffs (staff_id) 
+            ON DELETE NO ACTION ON UPDATE NO ACTION
+    );
+    ```
+
+- Table `sales.customers`
+
+    ```sql
+    CREATE TABLE sales.customers (
+	customer_id INT IDENTITY (1, 1) PRIMARY KEY,
+	first_name VARCHAR (255) NOT NULL,
+	last_name VARCHAR (255) NOT NULL,
+	phone VARCHAR (25),
+	email VARCHAR (255) NOT NULL,
+	street VARCHAR (255),
+	city VARCHAR (50),
+	state VARCHAR (25),
+	zip_code VARCHAR (5)
+    );
+    ```
+
+- Table `sales.orders`
+
+    ```sql
+    CREATE TABLE sales.orders (
+	order_id INT IDENTITY (1, 1) PRIMARY KEY,
+	customer_id INT,
+	order_status tinyint NOT NULL,
+	-- Order status: 1 = Pending; 2 = Processing; 3 = Rejected; 4 = Completed
+	order_date DATE NOT NULL,
+	required_date DATE NOT NULL,
+	shipped_date DATE,
+	store_id INT NOT NULL,
+	staff_id INT NOT NULL,
+	FOREIGN KEY (customer_id) 
+        REFERENCES sales.customers (customer_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (store_id) 
+        REFERENCES sales.stores (store_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (staff_id) 
+        REFERENCES sales.staffs (staff_id) 
+        ON DELETE NO ACTION ON UPDATE NO ACTION
+    );
+    ```
+
+- Table `sales.order_items`
+
+    ```sql
+    CREATE TABLE sales.order_items(
+	order_id INT,
+	item_id INT,
+	product_id INT NOT NULL,
+	quantity INT NOT NULL,
+	list_price DECIMAL (10, 2) NOT NULL,
+	discount DECIMAL (4, 2) NOT NULL DEFAULT 0,
+	PRIMARY KEY (order_id, item_id),
+	FOREIGN KEY (order_id) 
+        REFERENCES sales.orders (order_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+	FOREIGN KEY (product_id) 
+        REFERENCES production.products (product_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+    );
+    ```
+
+## Loading Data to Database
+
+- To load data into database please download this zip file. link is attacjed below
+- [BikeStore Dataset](https://www.sqlservertutorial.net/wp-content/uploads/SQL-Server-Sample-Database.zip)
+
+
+
